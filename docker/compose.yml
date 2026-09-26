@@ -1,0 +1,20 @@
+services:
+  xray:
+    image: "${xray_image}"
+    command: ["run", "-c", "/etc/xray/config.json"]
+    ports: ["443:443/tcp"]
+    volumes: ["./xray/config.json:/etc/xray/config.json:ro"]
+    restart: unless-stopped
+
+  hysteria:
+    image: "${hy2_image}"
+    command: ["server", "--config", "/etc/hysteria/config.yaml"]
+    # No TCP 443 here: it belongs to xray. UDP 443 + TCP 80 coexist.
+    ports: ["443:443/udp", "80:80/tcp"]
+    volumes:
+      - "./hysteria/config.yaml:/etc/hysteria/config.yaml:ro"
+      - "hysteria-certs:/app/certs"
+    restart: unless-stopped
+
+volumes:
+  hysteria-certs:

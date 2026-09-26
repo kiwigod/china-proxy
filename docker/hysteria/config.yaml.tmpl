@@ -1,0 +1,19 @@
+# Hysteria2 server. No tls.cert/tls.key: ACME manages them (named volume
+# hysteria-certs). No obfs, no QUIC/bandwidth tuning: defaults are fine.
+# No `acme.http` block: http-01 defaults to port 80, which is all we need
+# (upstream schema takes `altPort` there, not `addr`). No tls-alpn-01:
+# TCP 443 belongs to Xray.
+listen: ":443"
+acme:
+  domains:
+    - "${domain_name}"
+  email: "${acme_email}"
+  type: http
+auth:
+  type: password
+  password: "${hy2_password}"
+masquerade:
+  type: proxy
+  proxy:
+    url: "https://example.com"
+    rewriteHost: true
