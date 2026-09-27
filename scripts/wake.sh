@@ -18,9 +18,12 @@ import re;
 print(re.search(r'domain_name\s*=\s*\"([^\"]+)\"', open('tofu/tofu.tfvars').read()).group(1))")"
 CERT_STORE="${CERT_STORE:-$HOME/.china-proxy/certs/$DOMAIN}"
 KEY="${SSH_KEY:-$HOME/.ssh/china-proxy.pem}"
-[ -f "$KEY" ] || { echo "SSH key not found: $KEY (set SSH_KEY=...)" >&2; exit 1; }
 
 tofu -chdir=tofu apply -var-file=tofu.tfvars -auto-approve "$@"
+# The key pair is Tofu-managed: every apply-after-destroy creates NEW key
+# material, so the saved .pem is stale until re-exported (all SSH below
+# uses $KEY — without this, wake always fails auth).
+tofu -chdir=tofu output -raw ssh_private_key_pem > "$KEY" && chmod 600 "$KEY"
 IP="$(tofu -chdir=tofu output -raw static_ip)"
 
 # Recycled cloud IPs: drop any stale host key, re-establish trust on connect.

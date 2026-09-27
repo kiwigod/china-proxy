@@ -30,14 +30,19 @@ def vardefault(name):
     return re.search(r'variable "%s".*?default\s*=\s*"([^"]+)"' % name, varsrc, re.S).group(1)
 def tfvar(name):
     return re.search(r'%s\s*=\s*"([^"]+)"' % name, tfvars).group(1)
+def tfvar_or_default(name):
+    # Tofu semantics: tfvars wins over variable defaults (matters for the
+    # ECR fallback — image URIs live in tfvars, not defaults).
+    m = re.search(r'%s\s*=\s*"([^"]+)"' % name, tfvars)
+    return m.group(1) if m else vardefault(name)
 subs = {
-    'xray_image': vardefault('xray_image'),
-    'hy2_image': vardefault('hy2_image'),
+    'xray_image': tfvar_or_default('xray_image'),
+    'hy2_image': tfvar_or_default('hy2_image'),
     'xray_uuid': sec('xray_uuid'),
     'reality_private_key': sec('reality_private_key'),
     'reality_short_id': sec('reality_short_id'),
-    'reality_dest': vardefault('reality_dest'),
-    'reality_server_name': vardefault('reality_server_name'),
+    'reality_dest': tfvar_or_default('reality_dest'),
+    'reality_server_name': tfvar_or_default('reality_server_name'),
     'domain_name': tfvar('domain_name'),
     'acme_email': tfvar('acme_email'),
     'hy2_password': sec('hy2_password'),
