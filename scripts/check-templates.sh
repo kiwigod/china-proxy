@@ -27,5 +27,20 @@ for tmpl in ['tofu/user_data.tmpl.sh', 'docker/compose.yml',
         ok = False
     else:
         print('%-32s OK %s' % (tmpl, sorted(used)))
+# Structural: both services must keep image/command/ports (deleting a line
+# silently changes runtime behavior — compose still validates and deploys).
+try:
+    import yaml
+except ImportError:
+    print('compose structural check skipped (no PyYAML)')
+else:
+    svc = yaml.safe_load(open('docker/compose.yml'))['services']
+    for name in ('xray', 'hysteria'):
+        missing = [k for k in ('image', 'command', 'ports') if k not in svc.get(name, {})]
+        if missing:
+            print('docker/compose.yml service %s missing: %s' % (name, missing))
+            ok = False
+        else:
+            print('%-32s OK %s' % ('compose:' + name, sorted(svc[name].keys())))
 sys.exit(0 if ok else 1)
 PYEOF

@@ -1,6 +1,7 @@
 services:
   xray:
     image: "${xray_image}"
+    command: ["run", "-c", "/etc/xray/config.json"]
     # Run as root: the image defaults to UID 65532 (distroless nonroot) which
     # cannot read the 600 root-owned config; hysteria already runs as root,
     # so this keeps both services consistent instead of loosening file perms.
