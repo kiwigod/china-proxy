@@ -60,7 +60,8 @@ scp -i "$KEY" -o StrictHostKeyChecking=accept-new \
   "$RENDER_DIR/hysteria-config.yaml" "ubuntu@$IP:/tmp/config.yaml"
 
 # shellcheck disable=SC2087
-$SSH 'sudo install -m 644 /tmp/docker-compose.yml /opt/proxy/docker-compose.yml &&
+$SSH 'sudo mkdir -p /opt/proxy/xray /opt/proxy/hysteria &&
+      sudo install -m 644 /tmp/docker-compose.yml /opt/proxy/docker-compose.yml &&
       sudo install -m 600 /tmp/config.json /opt/proxy/xray/config.json &&
       sudo install -m 600 /tmp/config.yaml /opt/proxy/hysteria/config.yaml &&
       rm /tmp/docker-compose.yml /tmp/config.json /tmp/config.yaml &&

@@ -50,7 +50,7 @@ Pinned images (exact tags, see `tofu/variables.tf`):
    share links (`vless://…`, `hy2://…`). Links use the domain; before DNS
    propagates, swap the host for the static IP (Xray works via IP immediately).
 2. `cd tofu && tofu init && tofu plan -var-file=tofu.tfvars -out=tfplan` —
-   expect 4 resources: instance, static IP, attachment, public ports.
+   expect 5 resources: key pair, instance, static IP, attachment, public ports.
 3. `tofu apply tfplan`, note the `static_ip` output. Save the SSH key once:
    `tofu output -raw ssh_private_key_pem > ~/.ssh/china-proxy.pem && chmod 600 ~/.ssh/china-proxy.pem`.
 4. `./scripts/setup-dns.sh` (needs `CLOUDFLARE_API_TOKEN` env — Cloudflare

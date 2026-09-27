@@ -40,7 +40,7 @@ After EVERY flow: verify (§8) and report over QQ (§9).
    (skip if `tofu.tfvars` already matches the intended domain).
 2. `sing-box check -c $REPO/clients/sing-box.json` — must exit 0.
 3. `tofu -chdir=$REPO/tofu init && tofu plan -var-file=tofu.tfvars -out=tfplan`
-   — expect 4 resources (instance, static IP, attachment, public ports).
+   — expect 5 resources (key pair, instance, static IP, attachment, public ports).
 4. `tofu apply tfplan`; record `static_ip`. Save SSH key if missing (see §0).
 5. `CLOUDFLARE_API_TOKEN=... $REPO/scripts/setup-dns.sh` — creates the A
    record, waits for propagation, confirms ACME issuance. Exit 0 = cert live.

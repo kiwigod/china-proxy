@@ -1,13 +1,23 @@
-#!/bin/bash
+#!/bin/sh
 # Lightsail user_data: runs ONLY on first boot. Config changes after creation
 # MUST go through scripts/redeploy.sh over SSH, never by editing running files
 # or by expecting `tofu apply` to re-run this script.
-set -euo pipefail
+# POSIX sh ONLY: Lightsail executes this with dash (/bin/sh), ignoring the
+# shebang — no bashisms (no pipefail, [[ ]], arrays). Keep it that way.
+set -eu
 
-# Ubuntu repo packages only; no curl-piped installers, nothing built on the VPS.
+# Docker from Ubuntu repos; compose as a pinned upstream binary because
+# noble's repos ship no docker-compose-plugin. Versioned download, not a
+# curl-piped installer; nothing built on the VPS.
+COMPOSE_VERSION="v5.5.1" # verified 2026-09-27: latest stable, asset exists
 apt-get update
-apt-get install -y docker.io docker-compose-plugin
+apt-get install -y docker.io curl ca-certificates
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-x86_64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 systemctl enable --now docker
+usermod -aG docker ubuntu # Hermes/redeploy SSH runs as ubuntu, not root
 
 # Lightsail firewall is authoritative; a host firewall must not block us.
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
