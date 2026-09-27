@@ -23,7 +23,11 @@ VPS. All config changes after creation go through `scripts/redeploy.sh`.
 | `docker/hysteria/config.yaml.tmpl` | Hy2 `listen :443`, ACME http-01, password auth |
 | `scripts/generate-secrets.sh` | Secret + client-config generation (Mac only) |
 | `scripts/redeploy.sh` | Only supported config-update path (SSH) |
+| `scripts/setup-dns.sh` | Cloudflare A record + propagation wait + ACME confirm |
+| `scripts/certs-backup/restore.sh` | Hermes-local TLS bundle export/import (no LE reissue) |
+| `scripts/sleep.sh` / `wake.sh` | Hermes teardown/rebuild (destroy vs. apply+inject+DNS) |
 | `scripts/mirror-to-ecr.sh` | Fallback: verbatim upstream-image mirror to ECR |
+| `HERMES.md` | Agent runbook: diagnose, switch region, sleep/wake, report |
 
 Generated and never committed: `secrets/`, `clients/`, `tofu/tofu.tfvars`,
 `tofu/terraform.tfstate*` (see `.gitignore`). Note: Tofu state embeds
@@ -49,8 +53,12 @@ Pinned images (exact tags, see `tofu/variables.tf`):
    expect 4 resources: instance, static IP, attachment, public ports.
 3. `tofu apply tfplan`, note the `static_ip` output. Save the SSH key once:
    `tofu output -raw ssh_private_key_pem > ~/.ssh/china-proxy.pem && chmod 600 ~/.ssh/china-proxy.pem`.
-4. DNS `A <domain> -> <static_ip>`; wait for `dig +short <domain>` to match
-   before testing Hy2 (`docker logs hysteria` shows issuance; it retries).
+4. `./scripts/setup-dns.sh` (needs `CLOUDFLARE_API_TOKEN` env — Cloudflare
+   dashboard → My Profile → API Tokens → "Edit zone DNS" template, scoped to
+   your zone). Creates/updates the `A <domain> -> <static_ip>` record as
+   DNS-only, waits for propagation, then confirms Hysteria's ACME issuance
+   over SSH. Manual equivalent: grey-clouded A record in DNS → Records, wait
+   for `dig +short <domain>` to match, check `docker logs hysteria`.
 5. Import `clients/sing-box.json` or the share links into Hiddify/Streisand
    (iOS/macOS) or v2rayNG/NekoBox (Android). `china-auto` urltests both
    outbounds; private IPs + `geosite: cn` go direct.

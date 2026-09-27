@@ -18,9 +18,12 @@ variable "instance_name" {
 
 variable "bundle_id" {
   type    = string
-  # UNVERIFIED 2026-09-26: no AWS credentials on this machine to run
-  # `aws lightsail get-bundles`. `tofu plan` will reject an invalid ID;
-  # if small_3_0 is absent, pick the cheapest bundle with >= 1 GB RAM.
+  # Verified 2026-09-27 via AWS docs (get-bundles CLI reference + Lightsail
+  # bundles guide + pricing): nano_3_0 = 0.5 GB ($5), micro_3_0 = 1 GB ($7),
+  # small_3_0 = 2 GB ($12). Keep small_3_0: OS + dockerd + both proxies idle
+  # at ~500 MB RSS and first-boot apt/pull/ACME spikes toward ~1 GB; 512 MB
+  # leaves no headroom and Lightsail Ubuntu images ship without swap, so the
+  # OOM-killer is the only relief valve. Do NOT downsize to nano_3_0.
   default     = "small_3_0"
   description = "Lightsail bundle (size) for the instance."
 }

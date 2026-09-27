@@ -4,3 +4,5 @@ tofu/tofu.tfvars
 tofu/terraform.tfstate*
 tofu/tfplan
 tofu/.terraform/
+.env
+!.env.example
