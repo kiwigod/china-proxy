@@ -104,16 +104,18 @@ SSH="ssh -i $KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new ubuntu@$IP
 if [ "$SKIP_ACME" = 1 ]; then
   # Wake-with-injected-cert: no issuance will appear in logs. Health-check
   # instead (bundle presence + expiry were verified by certs-restore.sh).
-  UP="$($SSH 'docker ps --format "{{.Names}} {{.Status}}"' || true)"
-  echo "$UP" | grep -q '^hysteria Up' \
-    || { printf 'hysteria not Up:\n%s\n' "$UP" >&2; exit 1; }
-  echo "$UP" | grep -q '^xray Up' || echo "WARNING: xray not Up" >&2
+  # Service names via compose: container names carry the project prefix
+  # (proxy-hysteria-1), so bare `docker logs hysteria` does not resolve.
+  UP="$($SSH 'docker compose -f /opt/proxy/docker-compose.yml ps --format "{{.Service}} {{.State}}"' || true)"
+  echo "$UP" | grep -q '^hysteria running' \
+    || { printf 'hysteria not running:\n%s\n' "$UP" >&2; exit 1; }
+  echo "$UP" | grep -q '^xray running' || echo "WARNING: xray not running" >&2
   echo "DNS resolves; injected cert in place; confirm with an egress test."
   exit 0
 fi
 deadline=$((SECONDS + ${ACME_WAIT_MAX:-600}))
 while [ "$SECONDS" -lt "$deadline" ]; do
-  LOGS="$($SSH 'docker logs hysteria 2>&1 | tail -20' || true)"
+  LOGS="$($SSH 'docker compose -f /opt/proxy/docker-compose.yml logs --tail 20 hysteria 2>&1' || true)"
   if echo "$LOGS" | grep -qiE 'FATAL|invalid config'; then
     echo "$LOGS" >&2
     echo "hysteria config rejected (see above)" >&2
@@ -121,12 +123,12 @@ while [ "$SECONDS" -lt "$deadline" ]; do
   fi
   if echo "$LOGS" | grep -qiE 'certificat.*obtained|obtained.*certificat'; then
     echo "Hysteria holds a certificate for $DOMAIN"
-    $SSH 'docker ps --format "{{.Names}} {{.Status}}"' | grep -E '^(xray|hysteria) ' || true
+    $SSH 'docker compose -f /opt/proxy/docker-compose.yml ps --format "{{.Service}} {{.State}}"' | grep -E '^(xray|hysteria) running' || true
     echo "NEXT: import clients/sing-box.json (or the share links) and force the china-hy2 outbound to test."
     exit 0
   fi
   sleep 15
 done
 echo "timed out waiting for ACME issuance; recent hysteria logs:" >&2
-$SSH 'docker logs hysteria 2>&1 | tail -20' >&2 || true
+$SSH 'docker compose -f /opt/proxy/docker-compose.yml logs --tail 20 hysteria 2>&1' >&2 || true
 exit 1

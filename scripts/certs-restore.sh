@@ -35,4 +35,4 @@ VOLMP="$($SSH "docker volume ls -q | grep hysteria-certs | head -n 1 | xargs doc
 [ -n "$VOLMP" ] || { echo "no hysteria-certs volume on $IP (wait for first boot?)" >&2; exit 1; }
 
 cat "$BUNDLE" | $SSH "sudo tar xz -C '$VOLMP' ."
-$SSH 'docker restart hysteria && docker ps --format "{{.Names}} {{.Status}}" | grep -E "^(xray|hysteria) "'
+$SSH 'docker compose -f /opt/proxy/docker-compose.yml restart hysteria && docker compose -f /opt/proxy/docker-compose.yml ps --format "{{.Service}} {{.State}}" | grep -E "^(xray|hysteria) running"'

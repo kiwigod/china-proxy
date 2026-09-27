@@ -116,7 +116,7 @@ defaults), re-apply/redeploy. ECR holds verbatim upstream images — no builds.
 
 ## 8. Verification standard (end of every flow)
 
-- `docker ps --format '{{.Names}} {{.Status}}'` — expected services Up.
+- `docker compose -f /opt/proxy/docker-compose.yml ps --format '{{.Service}} {{.State}}'` over SSH — expect `xray running` + `hysteria running` (container names carry the `proxy-` prefix, so always address services via compose, never bare `docker logs/restart <name>`).
 - `dig +short <domain> @1.1.1.1` == `tofu output -raw static_ip` (Hy2 flows).
 - Egress per active protocol from THIS host (normal internet — a true
   end-to-end test): `sing-box run -c $REPO/clients/sing-box.json` exposing a

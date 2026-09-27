@@ -30,15 +30,15 @@ SSH="ssh -i $KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new ubuntu@$IP
 # First boot runs apt + pull + compose up concurrently (~3-6 min).
 deadline=$((SECONDS + 600))
 while [ "$SECONDS" -lt "$deadline" ]; do
-  UP="$($SSH 'docker ps --format "{{.Names}}"' 2>/dev/null || true)"
-  if echo "$UP" | grep -qx xray && echo "$UP" | grep -qx hysteria; then
-    echo "both services Up"
+  UP="$($SSH 'docker compose -f /opt/proxy/docker-compose.yml ps --format "{{.Service}}={{.State}}" 2>/dev/null' || true)"
+  if echo "$UP" | grep -qx 'xray=running' && echo "$UP" | grep -qx 'hysteria=running'; then
+    echo "both services running"
     break
   fi
   sleep 15
 done
-echo "$UP" | grep -qx xray || { echo "xray never came Up (check cloud-init on $IP)" >&2; exit 1; }
-echo "$UP" | grep -qx hysteria || { echo "hysteria never came Up (check cloud-init on $IP)" >&2; exit 1; }
+echo "$UP" | grep -qx 'xray=running' || { echo "xray never came Up (check cloud-init on $IP)" >&2; exit 1; }
+echo "$UP" | grep -qx 'hysteria=running' || { echo "hysteria never came Up (check cloud-init on $IP)" >&2; exit 1; }
 
 if [ -f "$CERT_STORE/hysteria-certs.tgz" ]; then
   ./scripts/certs-restore.sh
