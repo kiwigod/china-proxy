@@ -9,11 +9,13 @@ set -eu
 # Docker from Ubuntu repos; compose as a pinned upstream binary because
 # noble's repos ship no docker-compose-plugin. Versioned download, not a
 # curl-piped installer; nothing built on the VPS.
-COMPOSE_VERSION="v5.5.1" # verified 2026-09-27: latest stable, asset exists
+# v5.5.1 verified 2026-09-27: latest stable, asset exists. Literal here, not
+# a templatefile var — main.tf passes nothing for it, and tofu validate does
+# not catch missing template vars (only apply-time templatefile does).
 apt-get update
 apt-get install -y docker.io curl ca-certificates
 mkdir -p /usr/local/lib/docker/cli-plugins
-curl -fsSL "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-x86_64" \
+curl -fsSL "https://github.com/docker/compose/releases/download/v5.5.1/docker-compose-linux-x86_64" \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 systemctl enable --now docker

@@ -9,6 +9,10 @@ acme:
     - "${domain_name}"
   email: "${acme_email}"
   type: http
+  # Explicit: without this the server writes to ./acme under its working dir
+  # (/acme in this image; /app does not even exist), bypassing the
+  # hysteria-certs volume and losing certs on every recreation.
+  dir: /app/certs
 auth:
   type: password
   password: "${hy2_password}"
