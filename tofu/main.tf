@@ -97,4 +97,19 @@ resource "aws_lightsail_instance_public_ports" "proxy" {
     protocol  = "udp"
     cidrs     = ["0.0.0.0/0"]
   }
+
+  # Standby ports (8443): same inbounds via Docker NAT. Client-side failover
+  # with zero server change; applied in place, no rebuild/IP/DNS impact.
+  port_info {
+    from_port = 8443
+    to_port   = 8443
+    protocol  = "tcp"
+    cidrs     = ["0.0.0.0/0"]
+  }
+  port_info {
+    from_port = 8443
+    to_port   = 8443
+    protocol  = "udp"
+    cidrs     = ["0.0.0.0/0"]
+  }
 }

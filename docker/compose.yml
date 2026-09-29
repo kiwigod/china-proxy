@@ -6,7 +6,9 @@ services:
     # cannot read the 600 root-owned config; hysteria already runs as root,
     # so this keeps both services consistent instead of loosening file perms.
     user: "0:0"
-    ports: ["443:443/tcp"]
+    # 8443 standby shares the same inbound via Docker NAT (no new listener).
+    # Covers transient 443 anomalies + access-network per-port throttling.
+    ports: ["443:443/tcp", "8443:443/tcp"]
     volumes: ["./xray/config.json:/etc/xray/config.json:ro"]
     restart: unless-stopped
 
@@ -14,7 +16,8 @@ services:
     image: "${hy2_image}"
     command: ["server", "--config", "/etc/hysteria/config.yaml"]
     # No TCP 443 here: it belongs to xray. UDP 443 + TCP 80 coexist.
-    ports: ["443:443/udp", "80:80/tcp"]
+    # 8443 standby shares the same listener via Docker NAT (no config change).
+    ports: ["443:443/udp", "8443:443/udp", "80:80/tcp"]
     volumes:
       - "./hysteria/config.yaml:/etc/hysteria/config.yaml:ro"
       - "hysteria-certs:/app/certs"

@@ -66,7 +66,9 @@ protocol choice is client-side. Test each from your own egress (§8):
    - Alive → check containers over the same SSH:
      `ssh -i $SSH_KEY ubuntu@$(tofu -chdir=$REPO/tofu output -raw static_ip) 'docker compose -f /opt/proxy/docker-compose.yml ps'`.
      Dead container → §C (repair). Both Up but one protocol fails egress →
-     no server action: tell the user to use the working outbound client-side.
+     try its `:8443` outbound next (same credentials, standby port) before any
+     rebuild; if 8443 works it was port-level throttling, no server action —
+     tell the user to use the working outbound client-side.
    - Dead → is it the IP or the box?
      `aws lightsail get-instance --instance-name "${INSTANCE_NAME:-china-proxy}" --region "${AWS_REGION:-ap-southeast-1}"`
      plus a TCP probe: `IP=$(tofu -chdir=$REPO/tofu output -raw static_ip); timeout 10 bash -c "</dev/tcp/$IP/443" && echo open || echo closed`.
@@ -145,12 +147,13 @@ defaults), re-apply/redeploy. ECR holds verbatim upstream images — no builds.
 
 - `docker compose -f /opt/proxy/docker-compose.yml ps --format '{{.Service}} {{.State}}'` over SSH — expect `xray running` + `hysteria running` (container names carry the `proxy-` prefix, so always address services via compose, never bare `docker logs/restart <name>`).
 - `DOMAIN=$(grep '^domain_name' $REPO/tofu/tofu.tfvars | cut -d'"' -f2); test "$(dig +short "$DOMAIN" @1.1.1.1)" = "$(tofu -chdir=$REPO/tofu output -raw static_ip)" && echo "dig match"` (Hy2 flows).
-- Egress per protocol, both in turn (`china-xray`, then `china-hy2`), from THIS host:
+- Egress per protocol AND port, all four in turn (`china-xray`, `china-hy2`,
+  `china-xray-8443`, `china-hy2-8443`), from THIS host:
   the generated config has no inbound and `final` auto-selects, so inject both
-  per run — once per OUT in `china-xray china-hy2`:
+  per run — once per OUT in `china-xray china-hy2 china-xray-8443 china-hy2-8443`:
   `python3 -c "import json; c=json.load(open('$REPO/clients/sing-box.json')); c['inbounds']=[{'type':'mixed','tag':'t','listen':'127.0.0.1','listen_port':1080}]; c['route']['final']='OUT'; json.dump(c,open('/tmp/sb-OUT.json','w'))"`
   then `sing-box run -c /tmp/sb-china-xray.json & curl -x socks5h://127.0.0.1:1080 -s https://www.youtube.com --max-time 15 | head -c 200; kill %1`
-  (HTML expected; repeat for `china-hy2`, plus `https://openrouter.ai/api/v1/models` for any JSON).
+  (HTML expected; repeat for the other three, plus `https://openrouter.ai/api/v1/models` for any JSON).
 - Cert expiry for the QQ report: bundle paths print it (`notAfter=`); after a
   fresh issuance fetch it with: `ssh -i $SSH_KEY ubuntu@$(tofu -chdir=$REPO/tofu output -raw static_ip) "V=\$(docker volume ls -q|grep hysteria-certs|head -n1|xargs docker volume inspect -f '{{.Mountpoint}}'); sudo openssl x509 -enddate -noout -in \$(sudo find \$V -name '*.crt'|head -n1)"`.
 - Any check failing twice → escalate (§10), do not loop forever.

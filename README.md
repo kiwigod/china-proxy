@@ -21,9 +21,8 @@ VPS. All config changes after creation go through `scripts/redeploy.sh`.
 | `docker/compose.yml` | Xray + Hysteria2 services (images pinned via variables) |
 | `docker/xray/config.json.tmpl` | VLESS inbound `xtls-rprx-vision` + REALITY |
 | `docker/hysteria/config.yaml.tmpl` | Hy2 `listen :443`, ACME http-01, password auth |
+| `clash/verge.yaml.tmpl` | Clash Verge local profile (4 proxies, 1 auto group, CN-direct rules) |
 | `scripts/generate-secrets.sh` | Secret + client-config generation (Mac or Hermes host — needs docker) |
-PUT 29.<30:
-| `scripts/check-templates.sh` | Template-var + compose-structure guard — run before committing |
 | `scripts/redeploy.sh` | Only supported config-update path (SSH) |
 | `scripts/setup-dns.sh` | Cloudflare A record + propagation wait + ACME confirm |
 | `scripts/certs-backup/restore.sh` | Hermes-local TLS bundle export/import (no LE reissue) |
@@ -55,8 +54,9 @@ Pinned images (exact tags, see `tofu/variables.tf`):
 Run steps 1 and 4–6 from the repo root (step 4's `tofu -chdir=` works anywhere); steps 2–3 inside `tofu/`.
 
 1. `./scripts/generate-secrets.sh` — prompts for `domain_name` + `acme_email`,
-   writes `secrets/`, `tofu/tofu.tfvars`, `clients/sing-box.json`, prints both
-   share links (`vless://…`, `hy2://…`). Links use the domain; before DNS
+   writes `secrets/`, `tofu/tofu.tfvars`, `clients/sing-box.json`,
+   `clients/clash-verge.yaml`, prints all four share links (`vless://…`,
+   `hy2://…`, plus `:8443` standbys). Links use the domain; before DNS
    propagates, swap the host for the static IP (Xray works via IP immediately).
    One-time per deployment — never re-run on a live setup (it rotates all
    secrets and orphans existing clients); config changes go through `redeploy.sh`.
@@ -74,10 +74,11 @@ Run steps 1 and 4–6 from the repo root (step 4's `tofu -chdir=` works anywhere
    over SSH. Manual equivalent: grey-clouded A record in DNS → Records, wait
    for `dig +short <domain>` to match, check
    `docker compose -f /opt/proxy/docker-compose.yml logs hysteria` on the VPS.
-6. Import `clients/sing-box.json` or the share links into Hiddify/Streisand
-   (iOS/macOS) or v2rayNG/NekoBox (Android). `china-auto` urltests both
-   outbounds; private IPs + `geosite: cn` go direct.
-
+6. Import clients: `clients/sing-box.json` into Hiddify/Streisand (iOS/macOS)
+   or v2rayNG/NekoBox (Android); `clients/clash-verge.yaml` as a Clash Verge
+   local profile; or the four share links (`xray-link[-8443].txt`,
+   `hy2-link[-8443].txt`) anywhere URI import works. `china-auto` urltests all
+   four outbounds (5-min); private IPs + `geosite: cn` go direct.
 ## Updating config
 
 Never edit files on the VPS, never expect `tofu apply` to re-run `user_data`
@@ -102,11 +103,13 @@ After touching `tofu/` or `docker/` templates: `./scripts/check-templates.sh`.
   the server change alone breaks the handshake for old-SNI clients.
   Never use `www.microsoft.com` as dest (handshake exceeds Xray's 8192-byte
   limit, XTLS/Xray-core#6356).
-- **UDP 443 throttled** (advanced, manual — no script support): `listen ":8443"`
-  in `docker/hysteria/config.yaml.tmpl` + `"8443:8443/udp"` in
-  `docker/compose.yml` + a UDP 8443 `port_info` block in `tofu/main.tf`, then
-  `redeploy.sh`, change client port to `8443` in `clients/sing-box.json` +
-  `clients/hy2-link.txt`, re-import; keep Xray on TCP 443.
+- **Port 443 throttled/anomalous (either protocol):** use the standing 8443
+  standbys — no server change. Every client ships four outbounds
+  (`china-xray`, `china-hy2`, `china-xray-8443`, `china-hy2-8443`); switch
+  outbound client-side or let `china-auto` (5-min urltest) fail over on its
+  own. Covers transient 443 RST anomalies and per-port UDP throttling by
+  access ISPs. Fingerprint/SNI-level blocking is port-agnostic and is answered
+  by REALITY/Hy2 camouflage, not ports.
 - **Singapore slow/blocked:** `./scripts/sleep.sh`,
   `./scripts/set-region.sh ap-northeast-1` (validates first; append the AZ for
   non-default zones), `./scripts/wake.sh`. Same cert bundle, same domain
@@ -116,5 +119,6 @@ After touching `tofu/` or `docker/` templates: `./scripts/check-templates.sh`.
 ## Firewall (Lightsail, authoritative)
 
 22/tcp (SSH, `ssh_allowed_cidr` — tighten once your IP is known),
-80/tcp (ACME http-01 only), 443/tcp (Xray), 443/udp (Hy2). Host `ufw` is
-disabled by `user_data` so it can't shadow these.
+80/tcp (ACME http-01 only), 443/tcp (Xray) + 8443/tcp (standby), 443/udp (Hy2)
++ 8443/udp (standby). Host `ufw` is disabled by `user_data` so it can't
+shadow these.

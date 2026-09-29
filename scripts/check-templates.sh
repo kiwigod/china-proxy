@@ -35,8 +35,12 @@ except ImportError:
     print('compose structural check skipped (no PyYAML)')
 else:
     svc = yaml.safe_load(open('docker/compose.yml'))['services']
+    expect_ports = {'xray': ['443:443/tcp', '8443:443/tcp'],
+                    'hysteria': ['443:443/udp', '8443:443/udp', '80:80/tcp']}
     for name in ('xray', 'hysteria'):
         missing = [k for k in ('image', 'command', 'ports') if k not in svc.get(name, {})]
+        ports = svc.get(name, {}).get('ports', [])
+        missing += [p for p in expect_ports[name] if p not in ports]
         if missing:
             print('docker/compose.yml service %s missing: %s' % (name, missing))
             ok = False
