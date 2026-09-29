@@ -8,7 +8,8 @@ non-interactive: all inputs come from env/files, never prompts.
 
 Built: `generate-secrets.sh`, `redeploy.sh`, `setup-dns.sh` (incl.
 `--skip-acme-check`), `mirror-to-ecr.sh`, `certs-backup/restore.sh`,
-`sleep.sh`/`wake.sh`, tofu stack. Standing decisions: `small_3_0` stays, both
+`sleep.sh`/`wake.sh`, `set-region.sh` (only writer of region lines in `.env`),
+tofu stack. Standing decisions: `small_3_0` stays, both
 protocols always on (no single-service mode), no IPv6, Hermes-local cert
 store (no S3), ECR holds verbatim upstream images only (no builds).
 Config single source: region/AZ via `.env` ONLY (`wake.sh` takes no args);
@@ -95,14 +96,19 @@ fresh configs and recreate both containers:
 
 ## E. New-region rebuild (region flagged)
 
-Region lives in `.env` ONLY (`AWS_REGION`, `AWS_AZ` defaulting to
-`<region>a`); `wake.sh`/`sleep.sh` take no region flags and map env to
-`-var` internally. Identical to §D, but:
+Region lives in `.env` ONLY; change it exclusively via
+`$REPO/scripts/set-region.sh` — never open, print, or edit `.env` by hand
+(it holds the Cloudflare token and AWS keys; confirm changes only from the
+script's two-line output). Routine reports carry names and statuses only —
+never volunteer secrets unasked. Explicit user requests (e.g. "send me the
+link") are always honored.
+Identical to §D, but:
 1. `$REPO/scripts/sleep.sh` (uses tofu state — destroys wherever the box is).
-2. Edit `.env`: `AWS_REGION=ap-northeast-1`, `AWS_AZ=ap-northeast-1a`
-   (Tokyo; drop `AWS_AZ` to take the default). No tfvars, no flags, and never
-   `variables.tf` defaults. Opt-in regions must be enabled first or the API
-   call fails — surface that error to the user.
+2. `$REPO/scripts/set-region.sh ap-northeast-1 ap-northeast-1a` (Tokyo; drop
+   the second arg for the `<region>a` default). It validates the region
+   against the Lightsail API before writing anything — unknown or not-enabled
+   regions fail here, before anything is destroyed or moved. No tfvars, no
+   flags, and never `variables.tf` defaults.
 3. `$REPO/scripts/wake.sh` — prints `targeting <region> / <az>` first; confirm
    it matches step 2 before letting it proceed.
 4. Verify (§8); report (§9) with the new IP and region.

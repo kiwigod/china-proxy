@@ -30,6 +30,7 @@ PUT 29.<30:
 | `scripts/sleep.sh` / `wake.sh` | Hermes teardown/rebuild (destroy vs. apply+inject+DNS) |
 | `scripts/mirror-to-ecr.sh` | Fallback: verbatim upstream-image mirror to ECR |
 | `scripts/check-templates.sh` | Template-var + compose-structure guard — run before committing |
+| `scripts/set-region.sh` | Only writer of region lines in `.env` (validates first) |
 | `HERMES.md` | Agent runbook: diagnose, switch region, sleep/wake, report |
 
 Generated and never committed: `secrets/`, `clients/`, `tofu/tofu.tfvars`,
@@ -106,10 +107,11 @@ After touching `tofu/` or `docker/` templates: `./scripts/check-templates.sh`.
   `docker/compose.yml` + a UDP 8443 `port_info` block in `tofu/main.tf`, then
   `redeploy.sh`, change client port to `8443` in `clients/sing-box.json` +
   `clients/hy2-link.txt`, re-import; keep Xray on TCP 443.
-- **Singapore slow/blocked:** region lives in `.env` ONLY — `./scripts/sleep.sh`,
-  set `AWS_REGION=ap-northeast-1` (+ `AWS_AZ=ap-northeast-1a`, or drop it for
-  the `<region>a` default), `./scripts/wake.sh`. Same cert bundle, same domain
-  and clients; only the IP changes. Measure both regions before settling.
+- **Singapore slow/blocked:** `./scripts/sleep.sh`,
+  `./scripts/set-region.sh ap-northeast-1` (validates first; append the AZ for
+  non-default zones), `./scripts/wake.sh`. Same cert bundle, same domain
+  and clients; only the IP changes. Never hand-edit `.env`. Measure both
+  regions before settling.
 
 ## Firewall (Lightsail, authoritative)
 
