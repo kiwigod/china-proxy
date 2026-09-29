@@ -51,7 +51,7 @@ Pinned images (exact tags, see `tofu/variables.tf`):
 
 ## Bring-up (in order)
 
-Run steps 1, 4–5 from the repo root; steps 2–3 inside `tofu/`.
+Run steps 1 and 4–6 from the repo root (step 4's `tofu -chdir=` works anywhere); steps 2–3 inside `tofu/`.
 
 1. `./scripts/generate-secrets.sh` — prompts for `domain_name` + `acme_email`,
    writes `secrets/`, `tofu/tofu.tfvars`, `clients/sing-box.json`, prints both
@@ -61,16 +61,19 @@ Run steps 1, 4–5 from the repo root; steps 2–3 inside `tofu/`.
    secrets and orphans existing clients); config changes go through `redeploy.sh`.
 2. `cd tofu && tofu init && tofu plan -var-file=tofu.tfvars -out=tfplan` —
    expect 5 resources: key pair, instance, static IP, attachment, public ports.
-3. `tofu apply tfplan`, note the `static_ip` output. Save the SSH key once:
-   `tofu output -raw ssh_private_key_pem > ~/.ssh/china-proxy.pem && chmod 600 ~/.ssh/china-proxy.pem`.
-4. From the repo root: `./scripts/setup-dns.sh` (needs `CLOUDFLARE_API_TOKEN` env — Cloudflare
+3. `tofu apply tfplan`, note the `static_ip` output. Save the SSH key:
+   `mkdir -p ~/.ssh && tofu output -raw ssh_private_key_pem > ~/.ssh/china-proxy.pem && chmod 600 ~/.ssh/china-proxy.pem`.
+4. Wait ~3–6 min for first boot (`user_data` starts xray only, so an empty
+   volume never fires a doomed ACME order), then start Hysteria for issuance:
+   `ssh -i ~/.ssh/china-proxy.pem ubuntu@$(tofu -chdir=tofu output -raw static_ip) 'docker compose -f /opt/proxy/docker-compose.yml up -d hysteria'` (repeat until it succeeds — SSH appears before Docker is ready).
+5. From the repo root: `./scripts/setup-dns.sh` (needs `CLOUDFLARE_API_TOKEN` env — Cloudflare
    dashboard → My Profile → API Tokens → "Edit zone DNS" template, scoped to
    your zone). Creates/updates the `A <domain> -> <static_ip>` record as
    DNS-only, waits for propagation, then confirms Hysteria's ACME issuance
    over SSH. Manual equivalent: grey-clouded A record in DNS → Records, wait
    for `dig +short <domain>` to match, check
    `docker compose -f /opt/proxy/docker-compose.yml logs hysteria` on the VPS.
-5. Import `clients/sing-box.json` or the share links into Hiddify/Streisand
+6. Import `clients/sing-box.json` or the share links into Hiddify/Streisand
    (iOS/macOS) or v2rayNG/NekoBox (Android). `china-auto` urltests both
    outbounds; private IPs + `geosite: cn` go direct.
 

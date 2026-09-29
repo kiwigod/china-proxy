@@ -43,5 +43,9 @@ ${hysteria_config}
 __PROXY_HYSTERIA_EOF__
 
 # Idempotent on re-execution via SSH (overwrite + pull/up -d).
+# Boot xray ONLY: hysteria starts later via wake.sh (after cert inject) or
+# explicitly on first provisioning. Starting it here with an empty volume
+# would fire a doomed ACME order on every boot. Pull covers both images so
+# the later start needs no download.
 docker compose -f /opt/proxy/docker-compose.yml pull
-docker compose -f /opt/proxy/docker-compose.yml up -d
+docker compose -f /opt/proxy/docker-compose.yml up -d xray

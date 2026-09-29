@@ -47,9 +47,12 @@ After EVERY flow: verify (§8) and report over QQ (§9).
 4. `tofu -chdir=$REPO/tofu apply tfplan`; record `static_ip`. Save SSH key if
    missing or stale (after any destroy the key pair is recreated — always
    re-save here): `tofu -chdir=$REPO/tofu output -raw ssh_private_key_pem > $SSH_KEY && chmod 600 $SSH_KEY`.
-5. `CLOUDFLARE_API_TOKEN=... $REPO/scripts/setup-dns.sh` — creates the A
+5. Wait for first boot (xray Up — `user_data` no longer starts Hysteria, so an
+   empty volume never fires a doomed ACME order), then start it for issuance:
+   `IP=$(tofu -chdir=$REPO/tofu output -raw static_ip); for i in $(seq 1 40); do ssh -i $SSH_KEY ubuntu@$IP 'docker compose -f /opt/proxy/docker-compose.yml ps --format "{{.Service}}={{.State}}" 2>/dev/null' | grep -qx 'xray=running' && break; sleep 15; done; ssh -i $SSH_KEY ubuntu@$IP 'docker compose -f /opt/proxy/docker-compose.yml up -d hysteria'`.
+6. `CLOUDFLARE_API_TOKEN=... $REPO/scripts/setup-dns.sh` — creates the A
    record, waits for propagation, confirms ACME issuance. Exit 0 = cert live.
-6. Verify (§8) both protocols; report (§9).
+7. Verify (§8) both protocols; report (§9).
 
 ## B. Diagnose "lost connectivity" (always first)
 
