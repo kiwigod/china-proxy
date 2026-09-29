@@ -1,8 +1,9 @@
 #!/bin/bash
 # Hermes "wake up": apply -> wait for first boot -> restore certs (or fresh
 # issuance when no bundle exists) -> DNS update + propagation wait.
-# Extra args pass through to tofu apply (e.g. -var='aws_region=ap-northeast-1'
-# -var='az=ap-northeast-1a' for a region move). Expect ~5-10 min total.
+# Region comes from env ONLY (AWS_REGION/AWS_AZ); this script takes no
+# arguments and requires sleep.sh's lockfile (no lock = no clean teardown).
+# Expect ~5-10 min total.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -18,8 +19,17 @@ import re;
 print(re.search(r'domain_name\s*=\s*\"([^\"]+)\"', open('tofu/tofu.tfvars').read()).group(1))")"
 CERT_STORE="${CERT_STORE:-$HOME/.china-proxy/certs/$DOMAIN}"
 KEY="${SSH_KEY:-$HOME/.ssh/china-proxy.pem}"
+LOCKFILE="$ROOT/tofu/.asleep"
+[ $# -eq 0 ] || { echo "wake.sh takes no arguments (region via AWS_REGION/AWS_AZ in .env)" >&2; exit 1; }
+[ -f "$LOCKFILE" ] || { echo "no sleep lock ($LOCKFILE) — run sleep.sh first; refusing to wake without a clean teardown" >&2; exit 1; }
 
-tofu -chdir=tofu apply -var-file=tofu.tfvars -auto-approve "$@"
+# Single source for region targeting: env only. Never -var flags.
+AWS_REGION="${AWS_REGION:-ap-southeast-1}"
+AWS_AZ="${AWS_AZ:-${AWS_REGION}a}" # valid in every standard region; override per move/capacity
+REGION_VARS=(-var="aws_region=$AWS_REGION" -var="az=$AWS_AZ")
+echo "targeting $AWS_REGION / $AWS_AZ" >&2
+
+tofu -chdir=tofu apply -var-file=tofu.tfvars -auto-approve "${REGION_VARS[@]}"
 # The key pair is Tofu-managed: every apply-after-destroy creates NEW key
 # material, so the saved .pem is stale until re-exported (all SSH below
 # uses $KEY — without this, wake always fails auth). Atomic write: a
@@ -63,3 +73,4 @@ else
   CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN:-}" ./scripts/setup-dns.sh
 fi
 echo "awake: $DOMAIN -> $IP. NEXT: egress-test both outbounds (HERMES.md §8)."
+rm -f "$LOCKFILE" # consume: a completed wake invalidates the teardown proof

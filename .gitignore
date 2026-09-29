@@ -6,3 +6,4 @@ tofu/tfplan
 tofu/.terraform/
 .env
 !.env.example
+tofu/.asleep

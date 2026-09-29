@@ -106,10 +106,10 @@ After touching `tofu/` or `docker/` templates: `./scripts/check-templates.sh`.
   `docker/compose.yml` + a UDP 8443 `port_info` block in `tofu/main.tf`, then
   `redeploy.sh`, change client port to `8443` in `clients/sing-box.json` +
   `clients/hy2-link.txt`, re-import; keep Xray on TCP 443.
-- **Singapore slow/blocked:** `tofu apply -var='az=ap-northeast-1a'
-  -var='aws_region=ap-northeast-1'` (or append both to `tofu.tfvars`), then
-  re-run `setup-dns.sh` for the new IP (fresh ACME issuance on the new box;
-  back up certs first if near LE limits).
+- **Singapore slow/blocked:** region lives in `.env` ONLY — `./scripts/sleep.sh`,
+  set `AWS_REGION=ap-northeast-1` (+ `AWS_AZ=ap-northeast-1a`, or drop it for
+  the `<region>a` default), `./scripts/wake.sh`. Same cert bundle, same domain
+  and clients; only the IP changes. Measure both regions before settling.
 
 ## Firewall (Lightsail, authoritative)
 

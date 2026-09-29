@@ -11,6 +11,9 @@ Built: `generate-secrets.sh`, `redeploy.sh`, `setup-dns.sh` (incl.
 `sleep.sh`/`wake.sh`, tofu stack. Standing decisions: `small_3_0` stays, both
 protocols always on (no single-service mode), no IPv6, Hermes-local cert
 store (no S3), ECR holds verbatim upstream images only (no builds).
+Config single source: region/AZ via `.env` ONLY (`wake.sh` takes no args);
+`az` kept with default (provider+API require it, scout-verified);
+`sleep.sh` writes `tofu/.asleep`, `wake.sh` requires and consumes it.
 
 ## 0. Host prerequisites (one time)
 
@@ -92,13 +95,17 @@ fresh configs and recreate both containers:
 
 ## E. New-region rebuild (region flagged)
 
-Identical to §D, but destroy first, then wake with overrides, e.g.
-`$REPO/scripts/wake.sh -var='aws_region=ap-northeast-1' -var='az=ap-northeast-1a'`
-(Tokyo). Note: opt-in regions must be enabled in the account first or the
-API call fails — surface that error to the user. Persist a moved region by
-appending `aws_region = "..."` and `az = "..."` to `$REPO/tofu/tofu.tfvars`
-and exporting matching `AWS_REGION` (re-append after any `generate-secrets.sh`
-run — it rewrites `tofu.tfvars` wholesale); never change `variables.tf` defaults.
+Region lives in `.env` ONLY (`AWS_REGION`, `AWS_AZ` defaulting to
+`<region>a`); `wake.sh`/`sleep.sh` take no region flags and map env to
+`-var` internally. Identical to §D, but:
+1. `$REPO/scripts/sleep.sh` (uses tofu state — destroys wherever the box is).
+2. Edit `.env`: `AWS_REGION=ap-northeast-1`, `AWS_AZ=ap-northeast-1a`
+   (Tokyo; drop `AWS_AZ` to take the default). No tfvars, no flags, and never
+   `variables.tf` defaults. Opt-in regions must be enabled first or the API
+   call fails — surface that error to the user.
+3. `$REPO/scripts/wake.sh` — prints `targeting <region> / <az>` first; confirm
+   it matches step 2 before letting it proceed.
+4. Verify (§8); report (§9) with the new IP and region.
 
 ## F. Sleep (user going to bed — delete everything billable)
 
@@ -111,10 +118,12 @@ run — it rewrites `tofu.tfvars` wholesale); never change `variables.tf` defaul
 
 ## G. Wake (rebuild, ~5–10 min — set expectations in the reply)
 
-1. `$REPO/scripts/wake.sh` (extra tofu args pass through, e.g. region vars)
-   — applies (re-saving the recreated SSH key over `$SSH_KEY`), polls first boot,
-   restores the bundle when present (no LE issuance; certmagic resumes from
-   cache) else fresh-issues, updates DNS, waits for propagation.
+1. `$REPO/scripts/wake.sh` — refuses without `tofu/.asleep` (run §F first)
+   and takes no arguments (region via `.env`). Applies (re-saving the
+   recreated SSH key over `$SSH_KEY`), polls first boot, pre-creates the
+   volume, restores the bundle when present (no LE issuance; certmagic
+   resumes from cache) else fresh-issues, updates DNS, waits for propagation.
+   Consumes the lock on success — a second wake without re-sleep fails fast.
 2. Verify (§8) with emphasis on Hy2 (bundle expiry printed by the scripts,
    both containers Up, egress test through `china-hy2`).
 3. Report (§9): new IP, cert expiry, test results.
